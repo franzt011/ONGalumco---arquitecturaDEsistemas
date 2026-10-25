@@ -1,0 +1,36 @@
+# CI: en cada pull request y push a main revisa formato, lint (incluida la regla de capas),
+# compilación y pruebas. Si un paso falla, el check queda en rojo y no se debería hacer merge.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - name: Formato (Prettier)
+        run: npx prettier --check "src/**/*.ts"
+      - name: Lint (incluye la regla de capas)
+        run: npm run lint
+      - name: Build
+        run: npm run build
+      - name: Pruebas
+        run: npm test

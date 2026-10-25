@@ -1,0 +1,24 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "env": { "node": true },
+  "overrides": [
+    {
+      // Clean Architecture: dominio y aplicacion no pueden depender de frameworks ni de la nube.
+      // Si alguno de esos archivos importa NestJS o el SDK de AWS, el lint falla.
+      "files": ["src/dominio/**", "src/aplicacion/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@nestjs/*", "@aws-sdk/*", "express"],
+                "message": "dominio y aplicacion no pueden depender de NestJS, Express ni AWS"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
