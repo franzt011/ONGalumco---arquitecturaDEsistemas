@@ -22,6 +22,7 @@ import {
   VerForo,
 } from './foro-y-logros';
 import {
+  PedirUrlDeLectura,
   ActualizarCurso,
   CrearCurso,
   EliminarCurso,
@@ -51,6 +52,13 @@ async function preparar() {
   });
   await cargarDatosDeEjemplo(d);
   return d;
+}
+
+/** Inscribe a alumno-1 en curso-1 y completa sus dos módulos (requisito para rendir). */
+async function inscribirYCompletar(d: Awaited<ReturnType<typeof preparar>>) {
+  await new Inscribirse(d).ejecutar('alumno-1', 'curso-1');
+  await new AlternarModulo(d).ejecutar('alumno-1', 'curso-1', 'mod-1');
+  await new AlternarModulo(d).ejecutar('alumno-1', 'curso-1', 'mod-2');
 }
 
 describe('Alumno: inscripción y sala de clases', () => {
@@ -98,16 +106,31 @@ describe('Alumno: inscripción y sala de clases', () => {
 });
 
 describe('Alumno: examen', () => {
-  it('la vista del examen no trae respuestas correctas', async () => {
+  it('con módulos pendientes no puede rendir (antes solo lo bloqueaba el navegador)', async () => {
     const d = await preparar();
     await new Inscribirse(d).ejecutar('alumno-1', 'curso-1');
+    await new AlternarModulo(d).ejecutar('alumno-1', 'curso-1', 'mod-1');
+    await expect(
+      new RendirExamen(d).ejecutar('alumno-1', 'curso-1', {
+        intentoId: INTENTO_1,
+        respuestas: BIEN,
+      }),
+    ).rejects.toThrow('faltan 1');
+    expect(
+      (await d.inscripciones.buscar('alumno-1', 'curso-1'))?.intentosUsados,
+    ).toBe(0);
+  });
+
+  it('la vista del examen no trae respuestas correctas', async () => {
+    const d = await preparar();
+    await inscribirYCompletar(d);
     const vista = await new VerExamen(d).ejecutar('alumno-1', 'curso-1');
     expect(JSON.stringify(vista)).not.toMatch(/esCorrecta|respuestaVf/);
   });
 
   it('IDEMPOTENCIA: el mismo intentoId enviado dos veces gasta un solo intento', async () => {
     const d = await preparar();
-    await new Inscribirse(d).ejecutar('alumno-1', 'curso-1');
+    await inscribirYCompletar(d);
     const rendir = new RendirExamen(d);
     const primero = await rendir.ejecutar('alumno-1', 'curso-1', {
       intentoId: INTENTO_1,
@@ -126,7 +149,7 @@ describe('Alumno: examen', () => {
 
   it('con los intentos agotados no se califica (en Laravel se podía saltar enviando el formulario)', async () => {
     const d = await preparar();
-    await new Inscribirse(d).ejecutar('alumno-1', 'curso-1');
+    await inscribirYCompletar(d);
     const rendir = new RendirExamen(d);
     await rendir.ejecutar('alumno-1', 'curso-1', {
       intentoId: INTENTO_1,
@@ -146,7 +169,7 @@ describe('Alumno: examen', () => {
 
   it('al aprobar puede pedir el certificado si el profesor lo subió', async () => {
     const d = await preparar();
-    await new Inscribirse(d).ejecutar('alumno-1', 'curso-1');
+    await inscribirYCompletar(d);
     await expect(
       new ObtenerCertificado(d).ejecutar('alumno-1', 'curso-1'),
     ).rejects.toThrow(SinPermisoError);
@@ -227,6 +250,22 @@ describe('Profesor: gestión de cursos', () => {
   });
 });
 
+describe('Archivos', () => {
+  it('entrega URL de portadas y materiales, pero no de certificados', async () => {
+    const d = await preparar();
+    const leer = new PedirUrlDeLectura(d);
+    await expect(
+      leer.ejecutar('alumno-1', 'material/2026-10-25/a.pdf'),
+    ).resolves.toHaveProperty('url');
+    await expect(
+      leer.ejecutar('alumno-1', 'certificado/x.pdf'),
+    ).rejects.toThrow(SinPermisoError);
+    await expect(
+      leer.ejecutar('alumno-1', 'material/../certificado/x.pdf'),
+    ).rejects.toThrow(SinPermisoError);
+  });
+});
+
 describe('Usuarios', () => {
   it('el registro siempre crea alumnos (en Laravel se podía elegir profesor)', async () => {
     const d = await preparar();
@@ -300,8 +339,7 @@ describe('Foro y logros', () => {
 
   it('la gamificación suma XP por módulos y examen aprobado', async () => {
     const d = await preparar();
-    await new Inscribirse(d).ejecutar('alumno-1', 'curso-1');
-    await new AlternarModulo(d).ejecutar('alumno-1', 'curso-1', 'mod-1');
+    await inscribirYCompletar(d);
     await new RendirExamen(d).ejecutar('alumno-1', 'curso-1', {
       intentoId: INTENTO_1,
       respuestas: BIEN,
@@ -309,7 +347,8 @@ describe('Foro y logros', () => {
     const { estado, ranking } = await new MiGamificacion(d).ejecutar(
       'alumno-1',
     );
-    expect(estado.xpTotal).toBe(300);
+    // 2 módulos × 100 + 1 examen × 200
+    expect(estado.xpTotal).toBe(400);
     expect(ranking[0]).toMatchObject({
       usuarioId: 'alumno-1',
       posicion: 1,

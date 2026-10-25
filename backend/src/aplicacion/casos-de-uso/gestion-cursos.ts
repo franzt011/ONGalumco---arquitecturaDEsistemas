@@ -13,7 +13,11 @@ import {
   TipoArchivo,
 } from '../../dominio/archivo';
 import { CambiosCurso, Curso, DatosModulo, Modulo } from '../../dominio/curso';
-import { ConflictoError, ReglaDeNegocioError } from '../../dominio/errores';
+import {
+  ConflictoError,
+  ReglaDeNegocioError,
+  SinPermisoError,
+} from '../../dominio/errores';
 import {
   DatosOpcion,
   DatosPregunta,
@@ -307,6 +311,25 @@ export class PedirUrlDeSubida {
     const fecha = soloFecha(this.d.reloj.ahora());
     const clave = `${datos.tipo}/${fecha}/${this.d.ids.nuevo()}.${extensionDe(datos.nombre)}`;
     return { clave, url: await this.d.archivos.urlDeSubida(clave, datos.tipo) };
+  }
+}
+
+/**
+ * URL temporal para ver una portada o descargar un material de módulo.
+ * Los certificados NO se entregan por aquí: tienen su propio caso de uso, que exige haber aprobado.
+ */
+export class PedirUrlDeLectura {
+  constructor(private readonly d: Dependencias) {}
+
+  async ejecutar(usuarioId: string, clave: string): Promise<{ url: string }> {
+    await exigirUsuario(this.d, usuarioId);
+    if (!/^(material|portada)\/[\w./-]+$/.test(clave) || clave.includes('..')) {
+      throw new SinPermisoError(
+        'archivo-protegido',
+        'Este archivo no se puede pedir por aquí.',
+      );
+    }
+    return { url: await this.d.archivos.urlDeLectura(clave) };
   }
 }
 

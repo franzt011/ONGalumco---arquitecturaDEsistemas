@@ -86,9 +86,15 @@ export class Inscripcion {
 
   /**
    * Se llama antes de calificar, para no gastar un intento si el alumno no puede rendir.
-   * Lo nuevo: un curso ya aprobado no se vuelve a rendir (en Laravel sí se podía, y sumaba XP de nuevo).
+   * Lo nuevo:
+   * - Un curso ya aprobado no se vuelve a rendir (en Laravel sí se podía, y sumaba XP de nuevo).
+   * - Hay que completar todos los módulos actuales del curso. En Laravel esto solo lo revisaba
+   *   la página Show.vue (deshabilitaba el botón); llamando directo al servidor se podía saltar.
    */
-  exigirPuedeRendir(maxIntentos: number): void {
+  exigirPuedeRendir(
+    maxIntentos: number,
+    modulosDelCurso: readonly string[],
+  ): void {
     if (this._estado === 'completado') {
       throw new ReglaDeNegocioError(
         'curso-aprobado',
@@ -99,6 +105,15 @@ export class Inscripcion {
       throw new ReglaDeNegocioError(
         'intentos-agotados',
         'Has alcanzado el número máximo de intentos permitidos.',
+      );
+    }
+    const pendientes = modulosDelCurso.filter(
+      (id) => !this._modulosCompletados.includes(id),
+    );
+    if (pendientes.length > 0) {
+      throw new ReglaDeNegocioError(
+        'modulos-pendientes',
+        `Completa todos los módulos para desbloquear el examen (faltan ${pendientes.length}).`,
       );
     }
   }

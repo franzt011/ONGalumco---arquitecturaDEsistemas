@@ -1,0 +1,1 @@
+{"totalUsuarios":3,"porRol":[{"rol":"admin","total":1},{"rol":"profesor","total":1},{"rol":"alumno","total":1}],"porSexo":[{"sexo":"Femenino","total":1},{"sexo":"Masculino","total":1}],"porSede":[{"sede":"Santiago","total":2},{"sede":"Concepcion","total":1}],"porEdad":[{"rango":"30-39 años","total":1},{"rango":"20-29 años","total":1}],"finalizaciones":[]}

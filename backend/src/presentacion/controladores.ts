@@ -27,6 +27,7 @@ import {
   GuardarExamen,
   GuardarModulo,
   ListarCursosGestion,
+  PedirUrlDeLectura,
   PedirUrlDeSubida,
   PublicarCurso,
   VerCursoGestion,
@@ -210,6 +211,11 @@ export class ArchivosControlador {
   @Post('url-subida')
   urlDeSubida(@UsuarioActual() yo: Identidad, @Body() dto: UrlSubidaDto) {
     return new PedirUrlDeSubida(this.d).ejecutar(yo.usuarioId, dto);
+  }
+
+  @Get('url-lectura')
+  urlDeLectura(@UsuarioActual() yo: Identidad, @Query('clave') clave: string) {
+    return new PedirUrlDeLectura(this.d).ejecutar(yo.usuarioId, clave ?? '');
   }
 }
 

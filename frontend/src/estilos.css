@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .campo {
+    @apply w-full rounded-lg border-transparent bg-slate-50 focus:border-blue-500 focus:bg-white;
+  }
+  .boton-primario {
+    @apply rounded-xl bg-blue-600 px-6 py-2.5 font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .boton-oscuro {
+    @apply rounded-xl bg-slate-900 px-6 py-2.5 font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .boton-secundario {
+    @apply rounded-xl border border-slate-300 bg-white px-6 py-2.5 font-bold text-slate-700 transition hover:bg-slate-50;
+  }
+  .tarjeta {
+    @apply rounded-2xl border border-slate-200 bg-white shadow-sm;
+  }
+}

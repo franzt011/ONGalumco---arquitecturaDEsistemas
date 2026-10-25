@@ -20,7 +20,7 @@ Esta guía explica **qué se cambió, por qué, y qué pasos te faltan** para qu
 | Login | Sesión de Laravel Breeze, contraseñas en tu base de datos | **Amazon Cognito** (el backend nunca ve contraseñas) |
 | Archivos | `storage/app/public` del servidor | **S3 privado** con URL prefirmadas |
 | Servidor | VPS / EC2 con Apache, siempre encendido | **AWS Lambda**: se ejecuta solo cuando llega una petición |
-| Pruebas | Solo las de ejemplo de Breeze | 41 pruebas de las reglas reales, en 2 segundos |
+| Pruebas | Solo las de ejemplo de Breeze | 44 pruebas del backend y 12 de las páginas |
 
 **¿Por qué tanto cambio?** El ramo evalúa que la solución esté **desacoplada**. En Laravel, cambiar MySQL por DynamoDB obligaba a reescribir todos los controladores, porque cada uno tenía SQL adentro. Ahora los casos de uso solo conocen interfaces (`CursoRepository`, `InscripcionRepository`…), así que cambiar la base de datos es escribir un archivo nuevo en `infraestructura/` y cambiar una línea en `app.module.ts`.
 
@@ -62,7 +62,7 @@ Esta guía explica **qué se cambió, por qué, y qué pasos te faltan** para qu
 | `abort(403)`, `abort(404)` | `dominio/errores.ts` + `presentacion/problem-json.filtro.ts` |
 | `database/migrations/*` | No hay migraciones: DynamoDB no tiene esquema. El diseño de tablas está en la Parte 3, paso 3 |
 | Seeder | `infraestructura/memoria/datos-de-ejemplo.ts` |
-| `resources/js/Pages/*.vue` | **Pendiente** (Parte 3, paso 2): el frontend Vue se mantiene, pero llamando a la API |
+| `resources/js/Pages/*.vue` | `frontend/src/paginas/` (Vue + TypeScript, ahora llamando a la API) |
 
 ### 1.4 Errores de la versión Laravel que quedaron corregidos
 
@@ -96,10 +96,12 @@ Esta guía explica **qué se cambió, por qué, y qué pasos te faltan** para qu
 
 ## Parte 2: Cómo correr y probar lo que ya está hecho
 
+La forma más fácil es abrir la página: sigue "Cómo levantarlo" del README (dos terminales) y entra a http://localhost:5173. Lo de abajo prueba la API directamente.
+
 ```bash
 cd ~/Proyectos/Alumco/alumco-nest/backend
 npm install                         # solo la primera vez
-npm test                            # 41 pruebas
+npm test                            # 44 pruebas
 AUTH_MODO=desarrollo npm run start:dev
 ```
 
@@ -136,30 +138,49 @@ gh repo create alumco-nest --private --source=. --push    # o créalo desde gith
 - Trabaja con **una rama y un pull request por tarea**. El examen revisa los aportes de cada integrante en el repositorio.
 - **Concepto:** integración continua (Unidad III).
 
-### ☐ Paso 2: Frontend Vue como SPA separada (lo más largo)
+### ✅ Paso 2: Frontend Vue como SPA separada (hecho el 2026-10-25)
 
-Hoy las páginas Vue reciben los datos de Inertia (`defineProps`). Hay que hacer que los pidan a la API.
+Está en `frontend/`: Vue 3 + **TypeScript** + Vue Router + vue-i18n + Tailwind, con tus mismos colores Alumco y el mismo diseño de las páginas.
 
-1. Crea `frontend/` con `npm create vite@latest frontend -- --template vue-ts` (Vue + TypeScript).
-2. Copia `resources/js/Pages`, `Components` y `Layouts` de la versión Laravel.
-3. Cambia Inertia por **Vue Router** (rutas) y **fetch/axios** (datos):
+**Qué cambió respecto a las páginas de Laravel:**
+
+| Antes (Inertia) | Ahora (SPA) | Dónde |
+|---|---|---|
+| El controlador PHP mandaba los datos como `props` | Cada página los pide a la API con `fetch` | `src/api/alumco.ts` (una función por endpoint) |
+| `route('alumno.inscribir', id)` (Ziggy) | `inscribirse(cursoId)` | `src/api/alumco.ts` |
+| `$page.props.auth.user` | `sesion.perfil` | `src/sesion.ts` |
+| Middleware `EsAdmin` y `SoloAlumnos` | `meta.roles` en cada ruta | `src/router.ts` |
+| `alert('¡Rol actualizado!')` | Avisos flotantes que no bloquean la página | `src/avisos.ts` |
+| Textos fijos en español | `t('clave')` con `es.json` y `en.json`, más un selector de idioma | `src/i18n/` |
+| `diffForHumans()` | `Intl.RelativeTimeFormat` ("hace 2 horas" / "2 hours ago") | `src/formatos.ts` |
+| Archivos con `<input type=file>` dentro del formulario | URL prefirmada: pedir URL → subir directo a S3 → guardar la clave | `src/archivos.ts` |
 
 ```ts
 // Antes (Inertia): los datos llegaban como props desde el controlador PHP
-const props = defineProps<{ cursos: Curso[] }>();
-router.post(route('alumno.inscribir', curso.id));
+const props = defineProps({ misCursos: Array });
 
-// Después (SPA): el componente los pide a la API
-const cursos = ref<CursoDelCatalogo[]>([]);
-onMounted(async () => { cursos.value = await api.get('/catalogo'); });
-await api.post('/inscripciones', { cursoId: curso.cursoId });
+// Después (SPA): la página los pide a la API y maneja carga y error
+const { datos, cargando, error, recargar } = useCarga(verMisCursos);
 ```
 
-4. En `Show.vue`, `toggleCompletado` hoy hace `router.post(route('alumno.modulos.completar', moduloId))`. Cámbialo por ``api.post(`/cursos/${cursoId}/modulos/${moduloId}/completar`)`` y usa el `completado` que responde la API, en vez de cambiar la lista local antes de saber si el backend aceptó.
-5. En el examen, genera el `intentoId` al abrir la página: `const intentoId = crypto.randomUUID();`.
-6. **Internacionalización** (lo pide el proyecto): instala `vue-i18n`, pon los textos en `locales/es.json` y `locales/en.json`, y traduce los errores con el `codigo` que devuelve la API (`ya-inscrito`, `intentos-agotados`…).
-7. Muestra las fechas del foro con `Intl.RelativeTimeFormat` ("hace 2 horas" / "2 hours ago"), que reemplaza a `diffForHumans()`.
-8. Despliega en **AWS Amplify Hosting** o en S3 + CloudFront.
+**Errores de las páginas anteriores que quedaron corregidos:**
+- La barra de progreso de "Mis cursos" usaba `curso.progreso`, que el backend nunca mandaba: siempre marcaba 0%.
+- El examen solo se bloqueaba con módulos pendientes en el navegador; **ahora lo exige también el backend** (regla nueva en `Inscripcion.exigirPuedeRendir`).
+- El resultado del examen decía "+850 XP", escrito a mano; ahora muestra los +200 reales.
+- `Admin/Perfil.vue` mostraba estadísticas inventadas (12 cursos, 8 certificados, 95 de promedio) escritas en `routes/web.php`.
+- Al cambiar un rol, la tabla mostraba el rol nuevo aunque el servidor lo rechazara.
+- El buscador de alumnos pedía la página entera por cada tecla; ahora espera 300 ms.
+- No había menú en el celular (la auditoría lo marcó); ahora hay menú hamburguesa.
+- Los comentarios del foro siempre se publicaban en el primer módulo; ahora se elige el módulo.
+- El ranking estaba copiado en dos páginas; ahora es un solo componente (`ListaRanking.vue`).
+- Se quitaron botones que no hacían nada: "Escanear QR", "Califica este curso" y la pestaña "Notas y Chat".
+- La página de inicio era la plantilla por defecto de Laravel; ahora presenta a Alumco.
+
+**Lo que no se migró:** el recorte de la imagen de portada (el modal con zoom), que no guardaba el recorte en el servidor, y las páginas de contraseña y verificación de correo de Breeze, que las reemplaza Cognito.
+
+**Calidad:** 12 pruebas de páginas (`npm test`) montan la app con respuestas reales grabadas de la API. Además, `npm run revisar-i18n` falla si un texto no está en los dos idiomas. Los dos corren en la CI.
+
+**Pendiente de este paso:** el login real con Cognito (Paso 5: cambiar `src/sesion.ts` para guardar el token y mandarlo como `Authorization`) y publicar el frontend en **AWS Amplify Hosting** o S3 + CloudFront, con `VITE_API_URL` apuntando a API Gateway.
 
 - **Concepto:** separar frontend y backend (desacoplamiento), i18n.
 

@@ -126,6 +126,7 @@ export class MisCursos {
 
 export interface SalaDeClases {
   curso: VistaCurso;
+  cantidadPreguntas: number;
   modulosCompletados: string[];
   estado: EstadoVisible;
   intentosRestantes: number;
@@ -142,8 +143,10 @@ export class VerSalaDeClases {
     // En Laravel cualquier alumno podía abrir cualquier curso (incluso sin inscribirse)
     const inscripcion = await exigirInscripcion(this.d, alumnoId, cursoId);
     const estado = inscripcion.estadoVisible(curso.maxIntentos);
+    const examen = await this.d.examenes.buscarPorCurso(cursoId);
     return {
       curso: vistaCurso(curso),
+      cantidadPreguntas: examen?.cantidadPreguntas ?? 0,
       modulosCompletados: inscripcion.modulosCompletados.filter((id) =>
         curso.tieneModulo(id),
       ),
@@ -202,7 +205,10 @@ export class VerExamen {
     await exigirUsuario(this.d, alumnoId, ['alumno']);
     const curso = await exigirCurso(this.d, cursoId);
     const inscripcion = await exigirInscripcion(this.d, alumnoId, cursoId);
-    inscripcion.exigirPuedeRendir(curso.maxIntentos);
+    inscripcion.exigirPuedeRendir(
+      curso.maxIntentos,
+      curso.modulos.map((m) => m.moduloId),
+    );
     const examen = await this.d.examenes.buscarPorCurso(cursoId);
     if (!examen) {
       throw new NoEncontradoError(
@@ -256,7 +262,10 @@ export class RendirExamen {
       return this.respuesta(repetido, inscripcion, curso.maxIntentos);
     }
 
-    inscripcion.exigirPuedeRendir(curso.maxIntentos);
+    inscripcion.exigirPuedeRendir(
+      curso.maxIntentos,
+      curso.modulos.map((m) => m.moduloId),
+    );
     const examen = await this.d.examenes.buscarPorCurso(cursoId);
     if (!examen) {
       throw new NoEncontradoError(

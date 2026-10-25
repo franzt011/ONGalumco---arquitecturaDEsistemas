@@ -197,7 +197,19 @@ describe('Inscripcion', () => {
     i.registrarIntento(resultado(false), 'f');
     i.registrarIntento(resultado(false), 'f');
     expect(i.estadoVisible(2)).toBe('reprobado');
-    expect(() => i.exigirPuedeRendir(2)).toThrow('máximo de intentos');
+    expect(() => i.exigirPuedeRendir(2, [])).toThrow('máximo de intentos');
+  });
+
+  it('no se rinde con módulos pendientes', () => {
+    const i = new Inscripcion({
+      alumnoId: 'al',
+      cursoId: 'c1',
+      fechaInscripcion: '',
+    });
+    i.alternarModulo('m1');
+    expect(() => i.exigirPuedeRendir(2, ['m1', 'm2'])).toThrow('faltan 1');
+    i.alternarModulo('m2');
+    expect(() => i.exigirPuedeRendir(2, ['m1', 'm2'])).not.toThrow();
   });
 
   it('un curso aprobado no se vuelve a rendir', () => {
@@ -209,7 +221,7 @@ describe('Inscripcion', () => {
     i.registrarIntento(resultado(true), '2026-10-25');
     expect(i.estado).toBe('completado');
     expect(i.fechaTermino).toBe('2026-10-25');
-    expect(() => i.exigirPuedeRendir(2)).toThrow('Ya aprobaste');
+    expect(() => i.exigirPuedeRendir(2, [])).toThrow('Ya aprobaste');
   });
 });
 

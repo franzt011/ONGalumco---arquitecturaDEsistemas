@@ -1,0 +1,1 @@
+{"type":"/errores/modulos-pendientes","title":"La acción no cumple una regla de negocio","status":422,"detail":"Completa todos los módulos para desbloquear el examen (faltan 1).","codigo":"modulos-pendientes"}
